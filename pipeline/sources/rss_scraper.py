@@ -197,6 +197,11 @@ def run(
     if not candidates:
         return []
 
+    if dry_run:
+        for lead in candidates:
+            log.info("[dry-run] would insert: %s", lead["title"])
+        return candidates
+
     client = get_supabase()
     existing = fetch_recent_leads(client)
     new_leads = deduplicate(candidates, existing, threshold)
@@ -205,11 +210,6 @@ def run(
         len(new_leads),
         len(candidates) - len(new_leads),
     )
-
-    if dry_run:
-        for lead in new_leads:
-            log.info("[dry-run] would insert: %s", lead["title"])
-        return new_leads
 
     if new_leads:
         client.table("leads").insert(new_leads).execute()
