@@ -1,0 +1,15 @@
+# Core
+python-dotenv>=1.0
+supabase>=2.6
+anthropic>=0.39
+truststore>=0.9          # OS-native TLS verification (works behind AV/proxy MITM)
+
+# Sources (Phase 2)
+praw>=7.7              # Reddit
+feedparser>=6.0        # RSS
+requests>=2.32
+beautifulsoup4>=4.12
+
+# Processing (Phase 3)
+rapidfuzz>=3.9         # fuzzy dedup
+scikit-learn>=1.5      # TF-IDF + cosine clustering

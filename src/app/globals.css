@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+/* Brand tokens — dark, consumer-watchdog. Charcoal/navy base, amber/orange for
+   alerts, teal/emerald for "safe" signals. Each --color-* generates utilities
+   (bg-ink, text-fg, border-line, bg-warn, text-safe, ...). */
+@theme {
+  --color-ink: #0a0e1a;
+  --color-surface: #121a2e;
+  --color-surface-2: #18223c;
+  --color-line: #243049;
+  --color-fg: #e8edf7;
+  --color-muted: #93a1bd;
+  --color-warn: #f59e0b;
+  --color-warn-strong: #f97316;
+  --color-safe: #2dd4bf;
+  --color-safe-strong: #34d399;
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-ink);
+  color: var(--color-fg);
+}
+
+/* Rendered article HTML (body_html from the pipeline). */
+.article-body {
+  line-height: 1.75;
+  color: var(--color-fg);
+}
+.article-body h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.25;
+}
+.article-body h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+.article-body p {
+  margin-bottom: 1.1rem;
+  color: #d4ddee;
+}
+.article-body ul {
+  margin: 0 0 1.1rem 1.25rem;
+  list-style: disc;
+}
+.article-body li {
+  margin-bottom: 0.4rem;
+  color: #d4ddee;
+}
+.article-body a {
+  color: var(--color-safe);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.article-body a:hover {
+  color: var(--color-safe-strong);
+}

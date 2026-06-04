@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python pipeline/sources/rss_scraper.py --dry-run --since-days 30)",
+      "Bash(pip install *)",
+      "PowerShell(wmic logicaldisk *)"
+    ]
+  }
+}
