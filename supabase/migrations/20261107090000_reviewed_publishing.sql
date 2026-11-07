@@ -6,6 +6,9 @@ begin;
 -- Reader access is explicit and still filtered by the existing published-only RLS.
 grant select on public.articles, public.categories to anon, authenticated;
 
+-- Deterministic stale/withdrawn revision conflicts use PostgREST HTTP 409 (PT409).
+-- Never raise serialization_failure for them: hosted drivers may retry forever.
+
 alter table public.articles add column revised_at timestamptz;
 alter table public.articles add column evidence_label text;
 alter table public.articles add column editorial_stream text;
@@ -228,7 +231,7 @@ begin
  insert into ue_private.destinations(external_id, slug) values(p_external_id, p_slug) on conflict (external_id) do nothing;
  select * into strict d from ue_private.destinations where external_id = p_external_id for update;
  if d.slug <> p_slug then raise exception 'Article slug is immutable' using errcode = '22023'; end if;
- if d.current_hash is distinct from p_base_hash then raise exception 'Stale base revision' using errcode = '40001'; end if;
+ if d.current_hash is distinct from p_base_hash then raise exception 'Stale base revision' using errcode = 'PT409'; end if;
  if exists(select 1 from public.articles where slug = p_slug and id is distinct from d.article_id) then
    raise exception 'Slug belongs to an existing article' using errcode = '23505';
  end if;
@@ -267,7 +270,7 @@ begin
  end if;
  select * into strict d from ue_private.destinations where external_id = r.external_id for update;
  if (r.envelope->>'review_epoch')::integer is distinct from d.review_epoch then
-   raise exception 'Revision predates withdrawal; stage it again for review' using errcode = '40001';
+   raise exception 'Revision predates withdrawal; stage it again for review' using errcode = 'PT409';
  end if;
  if exists(select 1 from ue_private.receipts where revision_id = r.id) then
    raise exception 'Already published; use a reviewed correction or separate takedown procedure' using errcode = '22023';
@@ -293,13 +296,13 @@ begin
    'is_current', d.current_hash = r.revision_hash and d.withdrawn_at is null,
    'withdrawn', d.current_hash = r.revision_hash and d.withdrawn_at is not null); end if;
  if (r.envelope->>'review_epoch')::integer is distinct from d.review_epoch then
-   raise exception 'Revision predates withdrawal; stage it again for review' using errcode = '40001';
+   raise exception 'Revision predates withdrawal; stage it again for review' using errcode = 'PT409';
  end if;
  select * into approval from ue_private.approvals where revision_id = r.id and revoked_at is null for share;
  if not found then raise exception 'Revision has no active approval' using errcode = '42501'; end if;
  perform 1 from ue_private.members where user_id = approval.approved_by and role = 'editor' for share;
  if not found then raise exception 'Approver no longer has editorial access' using errcode = '42501'; end if;
- if d.current_hash is distinct from r.envelope->>'base_hash' then raise exception 'Stale base revision' using errcode = '40001'; end if;
+ if d.current_hash is distinct from r.envelope->>'base_hash' then raise exception 'Stale base revision' using errcode = 'PT409'; end if;
  p := r.envelope->'article';
  select id into strict category_uuid from public.categories where slug = p->>'category_slug';
  if d.article_id is null then
@@ -341,7 +344,7 @@ begin
  if p_revision_hash is distinct from r.revision_hash then raise exception 'Exact revision hash required' using errcode = '22023'; end if;
  select * into strict d from ue_private.destinations where external_id = r.external_id for update;
  if d.current_hash is distinct from r.revision_hash or d.article_id is null then
-   raise exception 'Only the current published revision can be withdrawn' using errcode = '40001';
+   raise exception 'Only the current published revision can be withdrawn' using errcode = 'PT409';
  end if;
  select receipt into result from ue_private.withdrawals where revision_id = r.id;
  if found then return result || jsonb_build_object('replayed', true); end if;

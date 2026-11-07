@@ -218,7 +218,7 @@ class DatabaseTests(unittest.TestCase):
         self.approve(second)
         self.approve(stale)
         self.publish(second)
-        self.publish(stale, error="40001")
+        self.publish(stale, error="PT409")
         old = json.loads(self.publish(first))
         self.assertFalse(old["is_current"])
         self.assertEqual(self.sql(f"select title from public.articles where id='{receipt['article_id']}';", role="anon"),
@@ -285,17 +285,17 @@ class DatabaseTests(unittest.TestCase):
         retried = json.loads(self.publish(first))
         self.assertTrue(retried["withdrawn"])
         self.assertFalse(retried["is_current"])
-        self.publish(second, error="40001")
+        self.publish(second, error="PT409")
         draft = json.loads(self.sql(f"select public.ue_social_draft('{first['revision_id']}');"))
         self.assertEqual(draft["status"], "withdrawn")
-        self.approve(second, error="40001")
+        self.approve(second, error="PT409")
         # Restaging changes the database-bound review epoch even for identical text.
         restored = self.stage(corrected, first["envelope"]["external_id"], first["revision_hash"])
         self.assertNotEqual(restored["revision_hash"], second["revision_hash"])
         self.approve(restored)
         replacement = json.loads(self.publish(restored))
         self.assertEqual(replacement["article_id"], receipt["article_id"])
-        self.sql(withdraw, error="40001")
+        self.sql(withdraw, error="PT409")
         self.assertEqual(self.sql(f"select title from public.articles where id='{receipt['article_id']}';", role="anon"), corrected["title"])
 
     def test_09_editor_and_publisher_memberships_cannot_overlap(self):
