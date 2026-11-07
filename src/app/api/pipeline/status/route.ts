@@ -5,18 +5,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // Pipeline health snapshot. Reads via the service-role client (leads/social_posts
 // aren't public under RLS), so this must stay server-side.
 //
-// NOTE: unauthenticated. If PIPELINE_STATUS_TOKEN is set, require it as a Bearer
-// token — set it in production so the snapshot (incl. flagged editor notes) isn't
-// world-readable.
+// Fail closed: no snapshot (including private editor notes) is available unless
+// a token is configured and the request supplies that exact Bearer credential.
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const token = process.env.PIPELINE_STATUS_TOKEN;
-  if (token) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${token}`) {
-      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    }
+  const auth = request.headers.get("authorization");
+  if (!token || auth !== `Bearer ${token}`) {
+    return NextResponse.json(
+      { error: "unauthorized" },
+      { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   const db = createAdminClient();
@@ -46,5 +46,5 @@ export async function GET(request: Request) {
       flagged_for_review: flaggedRes.data?.length ?? 0,
     },
     flagged: flaggedRes.data ?? [],
-  });
+  }, { headers: { "Cache-Control": "no-store" } });
 }
