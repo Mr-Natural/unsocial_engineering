@@ -66,7 +66,7 @@ export default async function ArticlePage({
     headline: article.title,
     description: article.summary ?? undefined,
     datePublished: article.published_at ?? undefined,
-    dateModified: article.published_at ?? article.created_at,
+    dateModified: article.revised_at ?? article.published_at ?? article.created_at,
     author: { "@type": "Organization", name: SITE_NAME },
     publisher: { "@type": "Organization", name: SITE_NAME },
     mainEntityOfPage: url,
@@ -76,7 +76,7 @@ export default async function ArticlePage({
     <div className="mx-auto max-w-6xl px-4 py-10">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
 
       <Link href="/scams" className="text-sm text-muted hover:text-fg">
@@ -94,6 +94,11 @@ export default async function ArticlePage({
             >
               {formatDate(article.published_at ?? article.created_at)}
             </time>
+            {article.revised_at && (
+              <time dateTime={isoDate(article.revised_at)} className="text-sm text-muted">
+                Updated {formatDate(article.revised_at)}
+              </time>
+            )}
           </div>
 
           <h1 className="mt-3 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">

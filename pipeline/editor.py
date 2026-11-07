@@ -4,7 +4,7 @@ Fetches each source URL client-side (so it works without a model-side web tool),
 passes the excerpts to Claude via a forced `emit_review` tool, then sets the
 article's status based on the returned confidence:
 
-  confidence >= threshold  -> 'published' if AUTO_PUBLISH else 'review'
+  confidence >= threshold  -> 'review' (owner approval is always required)
   confidence <  threshold  -> 'flagged'   (with editor_notes)
 
 Standalone:
@@ -85,11 +85,11 @@ def _build_user_content(article: dict, sources: dict[str, str]) -> str:
 
 
 def _fetch_draft(client, article_id: str | None) -> dict | None:
-    query = client.table("articles").select("*")
+    query = client.table("articles").select("*").eq("status", "draft")
     if article_id:
         rows = query.eq("id", article_id).limit(1).execute().data
     else:
-        rows = query.eq("status", "draft").order("created_at").limit(1).execute().data
+        rows = query.order("created_at").limit(1).execute().data
     return rows[0] if rows else None
 
 
@@ -144,11 +144,7 @@ def run(article_id: str | None = None, dry_run: bool = False) -> dict | None:
         update["summary"] = review["revised_summary"]
 
     if confidence >= config.confidence_threshold and not review.get("legal_risk"):
-        if config.auto_publish:
-            update["status"] = "published"
-            update["published_at"] = datetime.now(timezone.utc).isoformat()
-        else:
-            update["status"] = "review"
+        update["status"] = "review"
     else:
         update["status"] = "flagged"
 
@@ -161,7 +157,7 @@ def run(article_id: str | None = None, dry_run: bool = False) -> dict | None:
         log.info("[dry-run] would update article with: %s", {k: v for k, v in update.items() if k != "body_html"})
         return update
 
-    client.table("articles").update(update).eq("id", article["id"]).execute()
+    client.table("articles").update(update).eq("id", article["id"]).eq("status", "draft").execute()
     log.info("Updated article %s -> %s", article["id"], update["status"])
     return update
 

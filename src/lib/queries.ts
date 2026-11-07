@@ -6,7 +6,7 @@ export type ArticleWithCategory = Article & {
 };
 
 const CARD_FIELDS =
-  "id, title, slug, summary, ai_confidence, status, published_at, created_at, source_urls, category:categories(name, slug)";
+  "id, title, slug, summary, ai_confidence, status, published_at, revised_at, created_at, source_urls, category_id, category:categories(name, slug)";
 
 /** Latest published articles for the homepage grid. */
 export async function getLatestPublished(limit = 6): Promise<ArticleWithCategory[]> {

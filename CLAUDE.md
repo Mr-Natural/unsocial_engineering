@@ -57,9 +57,9 @@ Sources (Reddit/Twitter/RSS)
   → Deduplicate & score relevance
   → Writer agent drafts article
   → Editor agent verifies facts, checks tone, flags issues
-  → Human review queue (optional — toggle via config)
-  → Publish to Supabase
-  → Social agent generates platform-specific posts
+  → Owner reviews an immutable revision and explicitly approves its hash
+  → Restricted publisher commits that exact revision to Supabase
+  → Social copy remains a revision-linked review draft
 ```
 
 ## Design & Brand
@@ -71,7 +71,7 @@ Sources (Reddit/Twitter/RSS)
 ## AI Content Rules
 - Every article MUST cite its source(s) with links
 - Articles must NOT name individual victims unless from public court records
-- Confidence score (0-100) attached to every article — low confidence articles held for review
+- Confidence scores are editorial suggestions, never permission to publish. Every revision requires owner approval.
 - No legal advice — always direct to relevant authority (ACCC, FTC, Action Fraud, etc.)
 - Avoid AI writing tells: no em dashes, no "crucial/vital/landscape/navigate", no listicle padding
 
@@ -99,7 +99,7 @@ TWITTER_BEARER_TOKEN=
 
 ## Conventions
 - All Python scripts use `if __name__ == "__main__"` with argparse
-- Supabase RLS enabled — public read on articles, service role for pipeline writes
+- Supabase RLS enabled. New publishing uses restricted authenticated RPCs; legacy pipeline service-role access remains a migration risk. See AGENTS.md and docs/reviewed-publishing.md.
 - Slug format: `{category}-{title-slug}-{YYYYMMDD}`
 - All dates stored as UTC, displayed in user's local timezone
 - Git: conventional commits, main branch is production

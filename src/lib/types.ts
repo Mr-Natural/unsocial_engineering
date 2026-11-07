@@ -63,6 +63,7 @@ export interface Database {
           ai_confidence: number | null;
           status: string;
           editor_notes: string | null;
+          revised_at: string | null;
           created_at: string;
           published_at: string | null;
         };
@@ -77,6 +78,7 @@ export interface Database {
           ai_confidence?: number | null;
           status?: string;
           editor_notes?: string | null;
+          revised_at?: string | null;
           created_at?: string;
           published_at?: string | null;
         };
