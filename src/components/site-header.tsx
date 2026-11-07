@@ -2,28 +2,18 @@ import Link from "next/link";
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-50 border-b border-line bg-ink/85 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
-        <Link href="/" className="flex items-center gap-2 font-bold tracking-tight">
-          <svg viewBox="0 0 24 24" className="h-7 w-7 text-safe" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <path d="M12 2 4 5v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V5l-8-3Z" strokeLinejoin="round" />
-            <path d="m9 12 2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span className="text-base sm:text-lg">
-            Unsocial<span className="text-safe">Engineering</span>
-          </span>
+    <header className="border-b border-line bg-ink">
+      {process.env.VERCEL_ENV === "preview" && <p className="bg-safe px-4 py-2 text-center text-xs text-ink">Publishing rehearsal · Test content only</p>}
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-6 px-5 py-7 sm:px-10">
+        <Link href="/" className="flex items-center gap-3" aria-label="UnSocial Engineering home">
+          <span className="relative border border-line px-2 text-3xl leading-10" aria-hidden="true">U<span className="absolute -right-2 -top-2 text-xl text-safe">↗</span></span>
+          <span className="text-sm leading-tight">UnSocial<br /><span className="text-safe">Engineering</span></span>
         </Link>
-
-        <nav className="flex items-center gap-1 text-sm sm:gap-2">
-          <Link href="/scams" className="rounded-md px-3 py-2 text-muted hover:bg-surface hover:text-fg">
-            Browse
-          </Link>
-          <Link
-            href="/check"
-            className="rounded-md bg-warn px-3 py-2 font-medium text-ink hover:bg-warn-strong"
-          >
-            Is this a scam?
-          </Link>
+        <nav aria-label="Main navigation" className="flex flex-wrap items-center gap-x-6 gap-y-4 text-sm">
+          <Link href="/scams" className="hover:text-safe">Read</Link>
+          <Link href="/sources" className="hover:text-safe">Our sources</Link>
+          <Link href="/about" className="hover:text-safe">Our approach</Link>
+          <Link href="/check" className="border border-line px-4 py-3 hover:border-safe">Find help &nbsp; ↗</Link>
         </nav>
       </div>
     </header>

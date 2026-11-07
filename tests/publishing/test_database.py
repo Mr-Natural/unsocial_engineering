@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 EDITOR = "00000000-0000-0000-0000-000000000001"
 PUBLISHER = "00000000-0000-0000-0000-000000000002"
 STRANGER = "00000000-0000-0000-0000-000000000003"
+PRODUCER = "00000000-0000-0000-0000-000000000004"
 
 
 def literal(value):
@@ -71,6 +72,22 @@ class DatabaseTests(unittest.TestCase):
         cls.env = {k: v for k, v in os.environ.items() if not k.upper().startswith("PG")}
         cls.env["PGPASSWORD"] = secrets.token_urlsafe(32)
         cls.env["PGCLIENTENCODING"] = "UTF8"
+        # CI alone may use its digest-pinned disposable service container.
+        # No arbitrary URL/host/username/database or inherited libpq options.
+        external_port = os.environ.get("UE_TEST_CI_PORT")
+        if external_port:
+            if os.environ.get("GITHUB_ACTIONS") != "true" or not external_port.isdecimal():
+                raise RuntimeError("External test port is allowed only in isolated CI")
+            cls.port = int(external_port)
+            if not 1024 <= cls.port <= 65535:
+                raise RuntimeError("Invalid disposable CI port")
+            cls.env["PGPASSWORD"] = "disposable-ci-only"
+        else:
+            cls.start_owned_cluster()
+        cls.install_schema()
+
+    @classmethod
+    def start_owned_cluster(cls):
         password_file = cls.scratch / "init-password"
         password_file.write_text(cls.env["PGPASSWORD"], encoding="ascii")
         try:
@@ -89,6 +106,9 @@ class DatabaseTests(unittest.TestCase):
         if result.returncode:
             raise RuntimeError("Isolated server start failed: " + result.stderr)
         cls.addClassCleanup(cls.stop)
+
+    @classmethod
+    def install_schema(cls):
         cls.sql("""
           create role anon nologin;
           create role authenticated nologin;
@@ -107,7 +127,7 @@ class DatabaseTests(unittest.TestCase):
         cls.sql(f"""
           grant usage on schema public to anon, authenticated, service_role;
           grant select on public.articles, public.categories to anon, authenticated;
-          insert into ue_private.members values ('{EDITOR}', 'editor'), ('{PUBLISHER}', 'publisher');
+          insert into ue_private.members values ('{EDITOR}', 'editor'), ('{PUBLISHER}', 'publisher'), ('{PRODUCER}', 'producer');
         """, identity=None)
 
     @classmethod
@@ -158,6 +178,15 @@ class DatabaseTests(unittest.TestCase):
         self.sql(f"select public.ue_review_revision('{rev['revision_id']}');", role="service_role", error="42501")
         self.approve(rev, identity=PUBLISHER, error="42501")
         self.publish(rev, error="42501")
+
+    def test_producer_can_stage_but_cannot_approve_publish_or_withdraw(self):
+        rev = self.stage(identity=PRODUCER)
+        self.approve(rev, identity=PRODUCER, error="42501")
+        self.sql(f"select public.ue_publish_revision('{rev['revision_id']}', '{rev['revision_hash']}');",
+                 identity=PRODUCER, error="42501")
+        self.sql(f"select public.ue_withdraw_revision('{rev['revision_id']}', '{rev['revision_hash']}', 'test');",
+                 identity=PRODUCER, error="42501")
+        self.sql("select * from ue_private.revisions;", identity=PRODUCER, error="42501")
 
     def test_02_exact_approval_publication_and_retry(self):
         rev = self.stage()
@@ -238,6 +267,40 @@ class DatabaseTests(unittest.TestCase):
             receipts = list(executor.map(lambda _: json.loads(self.publish(rev)), [1, 2]))
         self.assertEqual(sum(r["replayed"] for r in receipts), 1)
         self.assertEqual(receipts[0]["article_id"], receipts[1]["article_id"])
+
+    def test_08_withdrawal_blocks_retries_and_queued_corrections(self):
+        first = self.stage()
+        self.approve(first)
+        receipt = json.loads(self.publish(first))
+        corrected = article(); corrected["title"] = "Replacement after explicit review"
+        second = self.stage(corrected, first["envelope"]["external_id"], first["revision_hash"])
+        self.approve(second)
+        withdraw = (f"select public.ue_withdraw_revision('{first['revision_id']}',"
+                    f"'{first['revision_hash']}', 'Synthetic withdrawal reason');")
+        self.sql(withdraw, identity=PUBLISHER, error="42501")
+        self.sql(withdraw, role="anon", error="42501")
+        self.sql(withdraw.replace(first["revision_hash"], "0" * 64), error="22023")
+        self.assertFalse(json.loads(self.sql(withdraw))["replayed"])
+        self.assertTrue(json.loads(self.sql(withdraw))["replayed"])
+        self.assertEqual(self.sql(f"select count(*) from public.articles where id='{receipt['article_id']}';", role="anon"), "0")
+        retried = json.loads(self.publish(first))
+        self.assertTrue(retried["withdrawn"])
+        self.assertFalse(retried["is_current"])
+        self.publish(second, error="40001")
+        draft = json.loads(self.sql(f"select public.ue_social_draft('{first['revision_id']}');"))
+        self.assertEqual(draft["status"], "withdrawn")
+        self.approve(second, error="40001")
+        # Restaging changes the database-bound review epoch even for identical text.
+        restored = self.stage(corrected, first["envelope"]["external_id"], first["revision_hash"])
+        self.assertNotEqual(restored["revision_hash"], second["revision_hash"])
+        self.approve(restored)
+        replacement = json.loads(self.publish(restored))
+        self.assertEqual(replacement["article_id"], receipt["article_id"])
+        self.sql(withdraw, error="40001")
+        self.assertEqual(self.sql(f"select title from public.articles where id='{receipt['article_id']}';", role="anon"), corrected["title"])
+
+    def test_09_editor_and_publisher_memberships_cannot_overlap(self):
+        self.sql(f"insert into ue_private.members values ('{EDITOR}', 'publisher');", identity=None, error="23505")
 
 
 if __name__ == "__main__":

@@ -3,20 +3,27 @@
 begin;
 
 alter table public.articles add column revised_at timestamptz;
+alter table public.articles add column evidence_label text;
+alter table public.articles add column editorial_stream text;
+alter table public.articles add column region text;
+alter table public.articles add column research_as_of timestamptz;
+alter table public.articles add column author_credit text;
 
 create schema ue_private;
 revoke all on schema ue_private from public, anon, authenticated, service_role;
 
 create table ue_private.members (
-  user_id uuid not null,
-  role text not null check (role in ('editor', 'publisher')),
+  user_id uuid not null unique,
+  role text not null check (role in ('producer', 'editor', 'publisher')),
   primary key (user_id, role)
 );
 create table ue_private.destinations (
   external_id text primary key,
   slug text not null unique,
   article_id uuid unique references public.articles(id),
-  current_hash text
+  current_hash text,
+  withdrawn_at timestamptz,
+  review_epoch integer not null default 0
 );
 create table ue_private.revisions (
   id uuid primary key default gen_random_uuid(),
@@ -46,11 +53,18 @@ create table ue_private.receipts (
   published_by uuid not null,
   receipt jsonb not null
 );
+create table ue_private.withdrawals (
+  revision_id uuid primary key references ue_private.revisions(id),
+  withdrawn_by uuid not null,
+  withdrawn_at timestamptz not null default now(),
+  reason text not null,
+  receipt jsonb not null
+);
 -- Separate from the legacy social queue: nothing here can be sent automatically.
 create table ue_private.social_drafts (
   revision_id uuid primary key references ue_private.revisions(id),
   content text not null,
-  status text not null default 'review_draft' check (status in ('review_draft', 'superseded'))
+  status text not null default 'review_draft' check (status in ('review_draft', 'superseded', 'withdrawn'))
 );
 alter table ue_private.members enable row level security;
 alter table ue_private.destinations enable row level security;
@@ -58,6 +72,7 @@ alter table ue_private.revisions enable row level security;
 alter table ue_private.approvals enable row level security;
 alter table ue_private.events enable row level security;
 alter table ue_private.receipts enable row level security;
+alter table ue_private.withdrawals enable row level security;
 alter table ue_private.social_drafts enable row level security;
 revoke all on all tables in schema ue_private from public, anon, authenticated, service_role;
 revoke all on all sequences in schema ue_private from public, anon, authenticated, service_role;
@@ -197,7 +212,7 @@ create function public.ue_stage_revision(p_external_id text, p_slug text, p_base
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare actor uuid; d ue_private.destinations%rowtype; r ue_private.revisions%rowtype; envelope jsonb; hash text; body text;
 begin
- actor := ue_private.require_role(array['editor','publisher']);
+ actor := ue_private.require_role(array['producer','editor']);
  if p_external_id is null or p_external_id !~ '^[a-zA-Z0-9][a-zA-Z0-9:_-]{0,127}$'
    or p_slug is null or length(p_slug) > 180 or p_slug !~ '^[a-z0-9]+(-[a-z0-9]+)*$' then
    raise exception 'Invalid article identity or slug' using errcode = '22023';
@@ -214,7 +229,7 @@ begin
    raise exception 'Slug belongs to an existing article' using errcode = '23505';
  end if;
  envelope := jsonb_build_object('schema_version', 'ue/1', 'renderer_version', 1, 'external_id', p_external_id,
-   'slug', p_slug, 'base_hash', p_base_hash, 'article', p_article, 'body_html', body);
+   'slug', p_slug, 'base_hash', p_base_hash, 'review_epoch', d.review_epoch, 'article', p_article, 'body_html', body);
  hash := encode(sha256(convert_to(envelope::text, 'UTF8')), 'hex');
  insert into ue_private.revisions(external_id, revision_hash, envelope, created_by)
    values(p_external_id, hash, envelope, actor) on conflict (revision_hash) do nothing;
@@ -226,22 +241,29 @@ create function public.ue_review_revision(p_revision_id uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r ue_private.revisions%rowtype;
 begin
- perform ue_private.require_role(array['editor','publisher']);
+ perform ue_private.require_role(array['producer','editor','publisher']);
  select * into strict r from ue_private.revisions where id = p_revision_id;
  return jsonb_build_object('revision_id', r.id, 'revision_hash', r.revision_hash, 'envelope', r.envelope,
    'approved', exists(select 1 from ue_private.approvals a join ue_private.members m on m.user_id = a.approved_by
        and m.role = 'editor' where a.revision_id = r.id and a.revoked_at is null),
-   'receipt', (select receipt from ue_private.receipts where revision_id = r.id));
+   'receipt', (select receipt from ue_private.receipts where revision_id = r.id),
+   'withdrawal', (select receipt from ue_private.withdrawals where revision_id = r.id),
+   'is_current', exists(select 1 from ue_private.destinations where external_id = r.external_id
+       and current_hash = r.revision_hash and withdrawn_at is null));
 end $$;
 
 create function public.ue_set_approval(p_revision_id uuid, p_revision_hash text, p_approved boolean) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare actor uuid; r ue_private.revisions%rowtype;
+declare actor uuid; r ue_private.revisions%rowtype; d ue_private.destinations%rowtype;
 begin
  actor := ue_private.require_role(array['editor']);
  select * into strict r from ue_private.revisions where id = p_revision_id for update;
  if p_revision_hash is distinct from r.revision_hash or p_approved is null then
    raise exception 'Exact revision hash and approval decision required' using errcode = '22023';
+ end if;
+ select * into strict d from ue_private.destinations where external_id = r.external_id for update;
+ if (r.envelope->>'review_epoch')::integer is distinct from d.review_epoch then
+   raise exception 'Revision predates withdrawal; stage it again for review' using errcode = '40001';
  end if;
  if exists(select 1 from ue_private.receipts where revision_id = r.id) then
    raise exception 'Already published; use a reviewed correction or separate takedown procedure' using errcode = '22023';
@@ -263,7 +285,12 @@ begin
  if p_revision_hash is distinct from r.revision_hash then raise exception 'Exact revision hash required' using errcode = '22023'; end if;
  select * into strict d from ue_private.destinations where external_id = r.external_id for update;
  select receipt into result from ue_private.receipts where revision_id = r.id;
- if found then return result || jsonb_build_object('replayed', true, 'is_current', d.current_hash = r.revision_hash); end if;
+ if found then return result || jsonb_build_object('replayed', true,
+   'is_current', d.current_hash = r.revision_hash and d.withdrawn_at is null,
+   'withdrawn', d.current_hash = r.revision_hash and d.withdrawn_at is not null); end if;
+ if (r.envelope->>'review_epoch')::integer is distinct from d.review_epoch then
+   raise exception 'Revision predates withdrawal; stage it again for review' using errcode = '40001';
+ end if;
  select * into approval from ue_private.approvals where revision_id = r.id and revoked_at is null for share;
  if not found then raise exception 'Revision has no active approval' using errcode = '42501'; end if;
  perform 1 from ue_private.members where user_id = approval.approved_by and role = 'editor' for share;
@@ -281,16 +308,52 @@ begin
      category_id = category_uuid, source_urls = array(select value->>'url' from jsonb_array_elements(p->'sources')),
      ai_confidence = null, status = 'published', revised_at = now() where id = article_uuid;
  end if;
- update ue_private.destinations set article_id = article_uuid, current_hash = r.revision_hash where external_id = r.external_id;
+ update public.articles set evidence_label = p->>'evidence_label', editorial_stream = p->>'stream',
+   region = p->>'region', research_as_of = (p->>'research_as_of')::timestamptz,
+   author_credit = p->>'author_credit' where id = article_uuid;
+ update ue_private.destinations set article_id = article_uuid, current_hash = r.revision_hash,
+   withdrawn_at = null where external_id = r.external_id;
  update ue_private.social_drafts set status = 'superseded' where revision_id in
    (select id from ue_private.revisions where external_id = r.external_id);
  insert into ue_private.social_drafts(revision_id, content)
- values(r.id, p->>'social_copy' || E'\n\nhttps://unsocialengineering.com/scams/' || d.slug);
+ values(r.id, p->>'social_copy' || E'\n\nhttps://www.unsocialengineering.com/scams/' || d.slug);
  result := jsonb_build_object('revision_id', r.id, 'revision_hash', r.revision_hash, 'article_id', article_uuid,
    'path', '/scams/' || d.slug, 'published_at', now(), 'social_status', 'review_draft');
  insert into ue_private.receipts(revision_id, article_id, published_by, receipt) values(r.id, article_uuid, actor, result);
  insert into ue_private.events(revision_id, action, actor) values(r.id, 'published', actor);
  return result || jsonb_build_object('replayed', false, 'is_current', true);
+end $$;
+
+-- An editor explicitly withdraws the exact live revision. Never a worker action.
+-- Retain the article/audit; public RLS hides its flagged row. Re-delivery cannot
+-- restore it. Any replacement needs a fresh, unrevoked revision approval.
+create function public.ue_withdraw_revision(p_revision_id uuid, p_revision_hash text, p_reason text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare actor uuid; r ue_private.revisions%rowtype; d ue_private.destinations%rowtype; result jsonb;
+begin
+ actor := ue_private.require_role(array['editor']);
+ perform ue_private.required_text(to_jsonb(p_reason), 2000);
+ select * into strict r from ue_private.revisions where id = p_revision_id for update;
+ if p_revision_hash is distinct from r.revision_hash then raise exception 'Exact revision hash required' using errcode = '22023'; end if;
+ select * into strict d from ue_private.destinations where external_id = r.external_id for update;
+ if d.current_hash is distinct from r.revision_hash or d.article_id is null then
+   raise exception 'Only the current published revision can be withdrawn' using errcode = '40001';
+ end if;
+ select receipt into result from ue_private.withdrawals where revision_id = r.id;
+ if found then return result || jsonb_build_object('replayed', true); end if;
+ update public.articles set status = 'flagged' where id = d.article_id;
+ update ue_private.destinations set withdrawn_at = now(), review_epoch = review_epoch + 1 where external_id = r.external_id;
+ update ue_private.social_drafts set status = 'withdrawn' where revision_id in
+   (select id from ue_private.revisions where external_id = r.external_id);
+ -- A queued correction approved before withdrawal must not silently restore it.
+ update ue_private.approvals set revoked_at = now() where revision_id in
+   (select id from ue_private.revisions where external_id = r.external_id)
+   and not exists(select 1 from ue_private.receipts rc where rc.revision_id = approvals.revision_id);
+ result := jsonb_build_object('revision_id', r.id, 'revision_hash', r.revision_hash,
+   'article_id', d.article_id, 'path', '/scams/' || d.slug, 'withdrawn_at', now(), 'status', 'withdrawn');
+ insert into ue_private.withdrawals(revision_id, withdrawn_by, reason, receipt) values(r.id, actor, p_reason, result);
+ insert into ue_private.events(revision_id, action, actor) values(r.id, 'withdrawn', actor);
+ return result || jsonb_build_object('replayed', false);
 end $$;
 
 create function public.ue_social_draft(p_revision_id uuid) returns jsonb
@@ -307,9 +370,11 @@ end $$;
 -- Revoke every new function explicitly before exposing only the narrow RPCs.
 revoke all on all functions in schema ue_private from public, anon, authenticated, service_role;
 revoke all on function public.ue_stage_revision(text,text,text,jsonb), public.ue_review_revision(uuid),
- public.ue_set_approval(uuid,text,boolean), public.ue_publish_revision(uuid,text), public.ue_social_draft(uuid)
+ public.ue_set_approval(uuid,text,boolean), public.ue_publish_revision(uuid,text), public.ue_social_draft(uuid),
+ public.ue_withdraw_revision(uuid,text,text)
  from public, anon, authenticated, service_role;
 grant execute on function public.ue_stage_revision(text,text,text,jsonb), public.ue_review_revision(uuid),
- public.ue_set_approval(uuid,text,boolean), public.ue_publish_revision(uuid,text), public.ue_social_draft(uuid)
+ public.ue_set_approval(uuid,text,boolean), public.ue_publish_revision(uuid,text), public.ue_social_draft(uuid),
+ public.ue_withdraw_revision(uuid,text,text)
  to authenticated;
 commit;

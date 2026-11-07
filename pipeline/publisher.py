@@ -89,6 +89,10 @@ class Publisher:
     def social_draft(self, revision_id: str):
         return self._rpc("ue_social_draft", {"p_revision_id": revision_id})
 
+    def withdraw(self, revision_id: str, revision_hash: str, reason: str):
+        return self._rpc("ue_withdraw_revision", {"p_revision_id": revision_id,
+                         "p_revision_hash": revision_hash, "p_reason": reason})
+
 
 def revision_id(value: str) -> str:
     try:
@@ -111,11 +115,13 @@ def main(argv=None) -> int:
     stage.add_argument("--external-id", required=True)
     stage.add_argument("--slug", required=True)
     stage.add_argument("--base-hash", type=revision_hash)
-    for command in ("review", "approve", "revoke", "publish", "social-draft"):
+    for command in ("review", "approve", "revoke", "publish", "social-draft", "withdraw"):
         cmd = sub.add_parser(command)
         cmd.add_argument("revision_id", type=revision_id)
-        if command in ("approve", "revoke", "publish"):
+        if command in ("approve", "revoke", "publish", "withdraw"):
             cmd.add_argument("--hash", required=True, type=revision_hash)
+        if command == "withdraw":
+            cmd.add_argument("--reason", required=True)
     args = parser.parse_args(argv)
     try:
         publisher = Publisher.from_environment()
@@ -130,6 +136,8 @@ def main(argv=None) -> int:
             result = publisher.approve(args.revision_id, args.hash, args.command == "approve")
         elif args.command == "publish":
             result = publisher.publish(args.revision_id, args.hash)
+        elif args.command == "withdraw":
+            result = publisher.withdraw(args.revision_id, args.hash, args.reason)
         else:
             result = publisher.social_draft(args.revision_id)
         # Draft output belongs in a private review workspace, never public CI logs.

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { ScamChecker } from "@/components/scam-checker";
 import { getLatestPublished } from "@/lib/queries";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Is this a scam?",

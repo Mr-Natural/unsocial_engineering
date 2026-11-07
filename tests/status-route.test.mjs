@@ -1,9 +1,12 @@
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
-const { test } = require('node:test');
-const ts = require('typescript');
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const source = fs.readFileSync(path.join(__dirname, '../src/app/api/pipeline/status/route.ts'), 'utf8');
 const compiled = ts.transpileModule(source, {

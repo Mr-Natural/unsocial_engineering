@@ -5,12 +5,7 @@ import { ArticleCard } from "@/components/article-card";
 import { CategoryFilter } from "@/components/category-filter";
 import { browseArticles, getCategories, getCategoryBySlug } from "@/lib/queries";
 
-export const revalidate = 300;
-
-export async function generateStaticParams() {
-  const categories = await getCategories();
-  return categories.map((c) => ({ slug: c.slug }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,

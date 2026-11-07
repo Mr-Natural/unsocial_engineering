@@ -158,5 +158,6 @@ export function assessRisk(flagCount: number): RiskResult {
 export const AUTHORITIES = [
   { name: "ACCC Scamwatch", region: "Australia", url: "https://www.scamwatch.gov.au/report-a-scam" },
   { name: "FTC", region: "United States", url: "https://reportfraud.ftc.gov" },
-  { name: "Action Fraud", region: "United Kingdom", url: "https://www.actionfraud.police.uk/reporting-fraud-and-cyber-crime" },
+  { name: "Report Fraud", region: "England, Wales and Northern Ireland", url: "https://www.reportfraud.police.uk/reporting-a-fraud/" },
+  { name: "Police Scotland", region: "Scotland", url: "https://www.scotland.police.uk/contact-us/" },
 ];

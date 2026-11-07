@@ -1,27 +1,30 @@
 @import "tailwindcss";
 
-/* Brand tokens — dark, consumer-watchdog. Charcoal/navy base, amber/orange for
-   alerts, teal/emerald for "safe" signals. Each --color-* generates utilities
-   (bg-ink, text-fg, border-line, bg-warn, text-safe, ...). */
+/* Editorial preview palette, with system fonts and no remote build-time fetch. */
 @theme {
-  --color-ink: #0a0e1a;
-  --color-surface: #121a2e;
-  --color-surface-2: #18223c;
-  --color-line: #243049;
-  --color-fg: #e8edf7;
-  --color-muted: #93a1bd;
-  --color-warn: #f59e0b;
-  --color-warn-strong: #f97316;
-  --color-safe: #2dd4bf;
-  --color-safe-strong: #34d399;
+  --color-ink: #0b1418;
+  --color-surface: #122126;
+  --color-surface-2: #192d30;
+  --color-line: #354a4d;
+  --color-fg: #f0f4e9;
+  --color-muted: #b3c4bd;
+  --color-warn: #e3c18f;
+  --color-warn-strong: #f3d8b0;
+  --color-safe: #b6e7c6;
+  --color-safe-strong: #d6f7df;
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-mono: Consolas, "Courier New", monospace;
 }
 
 :root {
   color-scheme: dark;
 }
+
+:focus-visible { outline: 2px solid var(--color-safe); outline-offset: 5px; }
+.skip-link { position: absolute; left: 1rem; top: -5rem; z-index: 100; background: var(--color-safe); color: var(--color-ink); padding: .8rem 1rem; }
+.skip-link:focus { top: 1rem; }
+.editorial-serif { font-family: Georgia, "Times New Roman", serif; font-style: italic; }
 
 body {
   background-color: var(--color-ink);

@@ -1,0 +1,63 @@
+name: Validate publishing pilot
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'codex/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Publishing validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        # PostgreSQL 17.11 bookworm; official multi-platform manifest, verified 2026-11-07.
+        image: postgres:17.11-bookworm@sha256:665dc7b37ac52a17e298511414c21d23ffa4e6a6ef6225b3e5d59c7afb35e994
+        env:
+          POSTGRES_USER: ue_test_owner
+          POSTGRES_PASSWORD: disposable-ci-only
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U ue_test_owner"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - name: Checkout the tested revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install verified build and scanner tools
+        run: bash ops/ci-tools.sh
+      - name: Check workflow security
+        run: |
+          actionlint -shellcheck=""
+          zizmor --offline --min-severity low --format plain .github/workflows
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Validate application and authentication
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm test:status
+      - name: Validate publication boundaries in a disposable database
+        env:
+          UE_TEST_CI_PORT: ${{ job.services.postgres.ports['5432'] }}
+        run: |
+          export UE_TEST_PG_BIN="$(dirname "$(command -v psql)")"
+          export UE_TEST_WORKDIR="$RUNNER_TEMP"
+          python3 -m unittest discover -s tests/publishing -v
+      - name: Build with synthetic configuration
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: synthetic-ci-key
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: pnpm build

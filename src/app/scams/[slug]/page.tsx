@@ -4,19 +4,13 @@ import { notFound } from "next/navigation";
 
 import { ArticleCard } from "@/components/article-card";
 import { CategoryBadge } from "@/components/category-badge";
-import { ConfidenceIndicator } from "@/components/confidence-indicator";
 import { ReportCTA } from "@/components/report-cta";
 import { ShareButtons } from "@/components/share-buttons";
 import { formatDate, isoDate } from "@/lib/format";
-import { getArticleBySlug, getPublishedSlugs, getRelatedArticles } from "@/lib/queries";
+import { getArticleBySlug, getRelatedArticles } from "@/lib/queries";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 
-export const revalidate = 300;
-
-export async function generateStaticParams() {
-  const slugs = await getPublishedSlugs();
-  return slugs.map((slug) => ({ slug }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -87,7 +81,7 @@ export default async function ArticlePage({
         <article>
           <div className="flex flex-wrap items-center gap-3">
             <CategoryBadge category={article.category} />
-            <ConfidenceIndicator value={article.ai_confidence} />
+            {article.evidence_label && <span className="text-xs text-safe">{article.evidence_label}</span>}
             <time
               dateTime={isoDate(article.published_at ?? article.created_at)}
               className="text-sm text-muted"
@@ -104,6 +98,11 @@ export default async function ArticlePage({
           <h1 className="mt-3 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
             {article.title}
           </h1>
+          <p className="mt-3 text-sm text-muted">
+            {article.author_credit ?? SITE_NAME}
+            {article.region ? ` · ${article.region}` : ""}
+            {article.research_as_of ? ` · Research checked ${formatDate(article.research_as_of)}` : ""}
+          </p>
 
           {article.summary && (
             <p className="mt-4 border-l-2 border-warn pl-4 text-lg text-muted">

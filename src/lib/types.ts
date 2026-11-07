@@ -64,6 +64,11 @@ export interface Database {
           status: string;
           editor_notes: string | null;
           revised_at: string | null;
+          evidence_label: string | null;
+          editorial_stream: string | null;
+          region: string | null;
+          research_as_of: string | null;
+          author_credit: string | null;
           created_at: string;
           published_at: string | null;
         };
@@ -79,6 +84,11 @@ export interface Database {
           status?: string;
           editor_notes?: string | null;
           revised_at?: string | null;
+          evidence_label?: string | null;
+          editorial_stream?: string | null;
+          region?: string | null;
+          research_as_of?: string | null;
+          author_credit?: string | null;
           created_at?: string;
           published_at?: string | null;
         };
