@@ -126,7 +126,6 @@ class DatabaseTests(unittest.TestCase):
             cls.sql(migration.read_text(encoding="utf-8-sig"), identity=None)
         cls.sql(f"""
           grant usage on schema public to anon, authenticated, service_role;
-          grant select on public.articles, public.categories to anon, authenticated;
           insert into ue_private.members values ('{EDITOR}', 'editor'), ('{PUBLISHER}', 'publisher'), ('{PRODUCER}', 'producer');
         """, identity=None)
 

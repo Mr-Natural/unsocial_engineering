@@ -2,6 +2,10 @@
 -- Apply only after verifying the intended Supabase project and reviewing this migration.
 begin;
 
+-- Branches can restore policies without the parent's default table grants.
+-- Reader access is explicit and still filtered by the existing published-only RLS.
+grant select on public.articles, public.categories to anon, authenticated;
+
 alter table public.articles add column revised_at timestamptz;
 alter table public.articles add column evidence_label text;
 alter table public.articles add column editorial_stream text;
