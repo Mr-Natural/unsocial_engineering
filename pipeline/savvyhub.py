@@ -34,6 +34,8 @@ def read_export(path: Path, expected_sha256: str):
     if not isinstance(package["slug"], str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", package["slug"]):
         raise PublishingError("Invalid article slug")
     if package["base_hash"] is not None:
+        if not isinstance(package["base_hash"], str):
+            raise PublishingError("Base revision hash must be text or null")
         revision_hash(package["base_hash"])
     return package
 

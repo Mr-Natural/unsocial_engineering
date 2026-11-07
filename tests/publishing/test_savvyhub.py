@@ -9,6 +9,16 @@ from pipeline.savvyhub import deliver, read_export
 
 
 class HubTransportTests(unittest.TestCase):
+    def test_malformed_base_hash_is_rejected(self):
+        package = dict(format='savvyhub-unsocial-draft-v1', destination='unsocialengineering.com',
+                       hub_item_id='synthetic-1', slug='synthetic-story', base_hash=123, article={})
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'export.json'
+            raw = json.dumps(package).encode()
+            path.write_bytes(raw)
+            with self.assertRaises(PublishingError):
+                read_export(path, hashlib.sha256(raw).hexdigest())
+
     def test_changed_export_fails_before_transport(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'export.json'
