@@ -30,6 +30,6 @@ mkdir "$tool_dir/bin"
 ln -s "$tool_dir/package/bin/pnpm.cjs" "$tool_dir/bin/pnpm"
 fetch https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz actionlint.tgz 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8 https://api.github.com/repos/rhysd/actionlint/releases/assets/384924896
 tar -xzf "$tool_dir/actionlint.tgz" -C "$tool_dir/bin" actionlint
-fetch https://github.com/zizmorcore/zizmor/releases/download/v1.32.0/zizmor-x86_64-unknown-linux-gnu.tar.gz zizmor.tgz bb110cc765eca9cd7efb2e284a956be5974c60027b0970f16397d86208a9957b
+fetch https://github.com/zizmorcore/zizmor/releases/download/v1.32.0/zizmor-x86_64-unknown-linux-gnu.tar.gz zizmor.tgz bb110cc765eca9cd7efb2e284a956be5974c60027b0970f16397d86208a9957b https://api.github.com/repos/zizmorcore/zizmor/releases/assets/703541932
 tar -xzf "$tool_dir/zizmor.tgz" -C "$tool_dir/bin"
 echo "$tool_dir/bin" >> "$GITHUB_PATH"
