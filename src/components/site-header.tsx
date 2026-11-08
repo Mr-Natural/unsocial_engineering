@@ -11,9 +11,10 @@ export function SiteHeader() {
         </Link>
         <nav aria-label="Main navigation" className="flex flex-wrap items-center gap-x-6 gap-y-4 text-sm">
           <Link href="/scams" className="hover:text-safe">Read</Link>
+          <Link href="/casebook/2026" className="hover:text-safe">2026 Casebook</Link>
           <Link href="/sources" className="hover:text-safe">Our sources</Link>
           <Link href="/about" className="hover:text-safe">Our approach</Link>
-          <Link href="/check" className="border border-line px-4 py-3 hover:border-safe">Find help &nbsp; ↗</Link>
+          <Link href="/resources" className="border border-line px-4 py-3 hover:border-safe">Help &amp; resources &nbsp; ↗</Link>
         </nav>
       </div>
     </header>

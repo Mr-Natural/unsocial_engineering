@@ -2,7 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
     "deploymentEnabled": {
-      "codex/unsocial-hosted-pilot-20261107": false
+      "codex/unsocial-hosted-pilot-20261107": false,
+      "codex/unsocial-collections-20261108": false
     }
   }
 }

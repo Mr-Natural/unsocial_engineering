@@ -48,6 +48,7 @@ jobs:
           pnpm lint
           pnpm typecheck
           pnpm test:status
+          pnpm test:collections
       - name: Validate publication boundaries in a disposable database
         env:
           UE_TEST_CI_PORT: ${{ job.services.postgres.ports['5432'] }}

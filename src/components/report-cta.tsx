@@ -13,6 +13,9 @@ export function ReportCTA() {
       >
         Check warning signs
       </Link>
+      <Link href="/resources" className="mt-4 block text-sm text-safe underline underline-offset-4">
+        Reporting and support by location
+      </Link>
     </div>
   );
 }

@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test:status": "node --test tests/status-route.test.mjs"
+    "test:status": "node --test tests/status-route.test.mjs",
+    "test:collections": "node --test tests/collections.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

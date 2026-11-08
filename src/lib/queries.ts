@@ -63,6 +63,7 @@ export async function browseArticles(opts: {
   categorySlug?: string;
   page?: number;
   pageSize?: number;
+  casebookYear?: number;
 }): Promise<BrowseResult> {
   const page = Math.max(1, opts.page ?? 1);
   const pageSize = opts.pageSize ?? 9;
@@ -81,6 +82,12 @@ export async function browseArticles(opts: {
   if (opts.q) {
     const term = opts.q.replace(/[,()*%]/g, " ").trim();
     if (term) query = query.or(`title.ilike.%${term}%,summary.ilike.%${term}%`);
+  }
+  if (opts.casebookYear !== undefined) {
+    if (!Number.isInteger(opts.casebookYear) || opts.casebookYear < 2000 || opts.casebookYear > 2099) {
+      return { articles: [], total: 0 };
+    }
+    query = query.like("slug", `${opts.casebookYear}-%`);
   }
 
   const { data, count, error } = await query

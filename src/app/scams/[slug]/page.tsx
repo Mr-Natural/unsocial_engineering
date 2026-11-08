@@ -6,6 +6,7 @@ import { ArticleCard } from "@/components/article-card";
 import { CategoryBadge } from "@/components/category-badge";
 import { ReportCTA } from "@/components/report-cta";
 import { ShareButtons } from "@/components/share-buttons";
+import { casebookYear } from "@/lib/casebook";
 import { formatDate, isoDate } from "@/lib/format";
 import { getArticleBySlug, getRelatedArticles } from "@/lib/queries";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
@@ -53,6 +54,7 @@ export default async function ArticlePage({
 
   const related = await getRelatedArticles(article);
   const url = `${SITE_URL}/scams/${slug}`;
+  const year = casebookYear(slug);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -86,7 +88,7 @@ export default async function ArticlePage({
               dateTime={isoDate(article.published_at ?? article.created_at)}
               className="text-sm text-muted"
             >
-              {formatDate(article.published_at ?? article.created_at)}
+              Published {formatDate(article.published_at ?? article.created_at)}
             </time>
             {article.revised_at && (
               <time dateTime={isoDate(article.revised_at)} className="text-sm text-muted">
@@ -94,6 +96,13 @@ export default async function ArticlePage({
               </time>
             )}
           </div>
+
+          {year !== null && (
+            <p className="mt-4 text-sm text-safe">
+              <Link href={`/casebook/${year}`} className="underline underline-offset-4">{year} Scam Casebook</Link>
+              {" · Retrospective. The incident, warning or operation date is identified in the article."}
+            </p>
+          )}
 
           <h1 className="mt-3 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
             {article.title}

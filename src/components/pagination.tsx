@@ -5,11 +5,13 @@ export function Pagination({
   total,
   pageSize,
   params,
+  basePath = "/scams",
 }: {
   page: number;
   total: number;
   pageSize: number;
   params: Record<string, string | undefined>;
+  basePath?: string;
 }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   if (totalPages <= 1) return null;
@@ -18,7 +20,7 @@ export function Pagination({
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) if (v) sp.set(k, v);
     sp.set("page", String(p));
-    return `/scams?${sp.toString()}`;
+    return `${basePath}?${sp.toString()}`;
   };
 
   const link = "rounded-lg border border-line bg-surface px-4 py-2 text-sm font-medium hover:border-slate-600";
