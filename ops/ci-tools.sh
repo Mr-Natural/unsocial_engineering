@@ -3,6 +3,7 @@
 set -euo pipefail
 tool_dir="$(mktemp -d "$RUNNER_TEMP/ue-tools.XXXXXX")"
 download() {
+  printf 'Downloading pinned tool: %s\n' "$1"
   # Retry transient HTTP failures (including 504) with bounded time and attempts.
   # Integrity checks below still run before any downloaded tool is executed.
   curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
@@ -17,13 +18,7 @@ fetch https://nodejs.org/dist/v24.22.2/node-v24.22.2-linux-x64.tar.xz node.tar.x
 tar -xJf "$tool_dir/node.tar.xz" -C "$tool_dir"
 export PATH="$tool_dir/node-v24.22.2-linux-x64/bin:$PATH"
 echo "$tool_dir/node-v24.22.2-linux-x64/bin" >> "$GITHUB_PATH"
-pnpm_archive='https://registry.npmjs.org/pnpm/-/pnpm-10.28.0.tgz'
-if ! download "$pnpm_archive" "$tool_dir/pnpm.tgz"; then
-  # Some registry edges can retain an upstream failure. Request the same pinned
-  # artifact with a separate cache key; the SHA-512 check below remains mandatory.
-  echo 'Retrying the fixed pnpm archive through its official registry cache.'
-  download "${pnpm_archive}?download=1" "$tool_dir/pnpm.tgz"
-fi
+download https://registry.npmjs.org/pnpm/-/pnpm-10.28.0.tgz "$tool_dir/pnpm.tgz"
 node -e 'const f=require("node:fs"),c=require("node:crypto");if(c.createHash("sha512").update(f.readFileSync(process.argv[1])).digest("base64")!=="Bd9x0UIfITmeBT/eVnzqNNRG+gLHZXFEG/wceVbpjjYwiJgtlARl/TRIDU2QoGaLwSNi+KqIAApk6D0LDke+SA==")process.exit(1)' "$tool_dir/pnpm.tgz"
 tar -xzf "$tool_dir/pnpm.tgz" -C "$tool_dir"
 mkdir "$tool_dir/bin"
